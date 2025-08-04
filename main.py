@@ -84,11 +84,14 @@ async def send_progress_bar():
 
 
 
-def extract_spotify_from_caption(caption):
-    match = re.search(r'https?://open\.spotify\.com/track/([a-zA-Z0-9]+)', caption)
-    if match:
-        return {"track_id": match.group(1)}
-    return {"track_id": None}
+import re
+
+def extract_spotify_from_caption(caption: str) -> dict:
+    match = re.search(r'https?://open\.spotify\.com/track/([a-zA-Z0-9]+)', caption)
+    if match:
+        return {"track_id": match.group(1)}
+    return {"track_id": None}
+
 
 
 # ✅ Handle stats & ping in PROGRESS_CHANNEL
