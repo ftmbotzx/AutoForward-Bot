@@ -89,9 +89,6 @@ async def send_progress_bar():
 import re
 
 def extract_spotify_from_msg(msg) -> dict:
-    import re
-    from pyrogram.helpers import render_message
-
     try:
         # Try getting HTML version of caption or text
         text = render_message(msg, "html")
