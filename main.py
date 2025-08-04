@@ -17,7 +17,7 @@ logging.basicConfig(
 # ✅ MongoDB setup
 MONGO_URI = "mongodb+srv://ftmbotzx:ftmbotzx@cluster0.0b8imks.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0"
 DB_NAME = "forwardDB"
-COLLECTION_NAME = "progresd3"
+COLLECTION_NAME = "ftmdb"
 
 mongo_client = AsyncIOMotorClient(MONGO_URI)
 db = mongo_client[DB_NAME]
