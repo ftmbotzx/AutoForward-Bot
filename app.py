@@ -7,7 +7,7 @@ import asyncio
 # --- CONFIG ---
 MONGO_URI = "mongodb+srv://ftmbotzx:ftmbotzx@cluster0.0b8imks.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0"
 DB_NAME = "forwardDB"
-PROGRESS_COLLECTION = "ftmdb"
+PROGRESS_COLLECTION = "ftmdb1"
 FORWARDED_COLLECTION = "forwarded_files"
 
 # --- Flask App ---
