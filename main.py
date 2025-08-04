@@ -17,7 +17,7 @@ logging.basicConfig(
 # ✅ MongoDB setup
 MONGO_URI = "mongodb+srv://ftmbotzx:ftmbotzx@cluster0.0b8imks.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0"
 DB_NAME = "forwardDB"
-COLLECTION_NAME = "ftmdb"
+COLLECTION_NAME = "ftmdb1"
 
 mongo_client = AsyncIOMotorClient(MONGO_URI)
 db = mongo_client[DB_NAME]
@@ -32,7 +32,7 @@ client = TelegramClient(StringSession(session_string), api_id, api_hash)
 
 # ✅ Channels Config
 SOURCE_CHANNEL = "Spotifyapk56"        # Source channel username (without @)
-TARGET_CHANNEL = -1002775886582        # Target private channel ID
+TARGET_CHANNEL = -1002752194267     # Target private channel ID
 PROGRESS_CHANNEL = "@ftmdeveloperz"    # Log channel
 
 # ✅ Stats tracking
