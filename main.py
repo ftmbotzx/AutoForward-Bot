@@ -45,37 +45,7 @@ stats = {"total_messages": 0, "forwarded": 0, "skipped": 0}
 start_time = time.time()
 
 # 🔍 Spotify Link Extractor
-def extract_spotify_from_caption(caption: str) -> dict:
-    """
-    Extracts Spotify track ID from 'info' section only.
-    Returns { 'track_id': str or None }
-    """
-    if not caption:
-        return {"track_id": None}
 
-    # Remove invisible separators
-    clean_caption = caption
-    for char in ['\u2063', '\u200b', '\u200c', '\u200d', '\ufeff']:
-        clean_caption = clean_caption.replace(char, '')
-
-    # Find the 'info' section
-    info_match = re.search(r'info[:\-\s]*([^\n\r]+)', clean_caption, re.IGNORECASE)
-    if not info_match:
-        return {"track_id": None}
-
-    info_text = info_match.group(1).strip()
-
-    # Search for Spotify URL in the info section
-    spotify_match = re.search(r'(https?://open\.spotify\.com/track/([a-zA-Z0-9]+))', info_text)
-    if spotify_match:
-        return {"track_id": spotify_match.group(2)}
-
-    # Fallback: raw Spotify ID
-    raw_id_match = re.search(r'\b([A-Za-z0-9]{22})\b', info_text)
-    if raw_id_match:
-        return {"track_id": raw_id_match.group(1)}
-
-    return {"track_id": None}
 
 # ✅ MongoDB helpers
 async def get_last_message_id():
@@ -110,6 +80,17 @@ async def send_progress_bar():
     except Exception as e:
         logging.error(f"⚠️ Could not send progress bar: {e}")
 
+
+
+
+
+def extract_spotify_from_caption(caption):
+    match = re.search(r'https?://open\.spotify\.com/track/([a-zA-Z0-9]+)', caption)
+    if match:
+        return {"track_id": match.group(1)}
+    return {"track_id": None}
+
+
 # ✅ Handle stats & ping in PROGRESS_CHANNEL
 @app.on_message(filters.chat(PROGRESS_CHANNEL) & filters.text)
 async def handle_commands(client, message):
@@ -136,7 +117,9 @@ async def poll_channel():
                 stats["total_messages"] += 1
                 try:
                     # ✅ Extract Spotify ID from caption
-                    track_info = extract_spotify_from_caption(msg.caption or "")
+                    caption = msg.caption or ""
+                    logging.info(f"New {caption}")
+                    track_info = extract_spotify_from_caption(caption)
                     track_id = track_info.get("track_id") or "N/A"
 
                     # ✅ Get song & artist metadata
