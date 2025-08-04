@@ -3,8 +3,6 @@ from pyrogram import Client, filters
 from pyrogram import utils as pyroutils
 from motor.motor_asyncio import AsyncIOMotorClient  # MongoDB (async)
 import app  # ✅ Import our API module
-from pyrogram.helpers import render_message
-
 
 # ✅ Pass main.py’s running loop to Flask
 app.set_shared_loop(asyncio.get_event_loop())
@@ -89,21 +87,31 @@ async def send_progress_bar():
 import re
 
 def extract_spotify_from_msg(msg) -> dict:
-    try:
-        # Try getting HTML version of caption or text
-        text = render_message(msg, "html")
-        logging.info(f"🔎 HTML Caption/Text: {text}")
-    except Exception:
-        # Fallback to raw caption/text if HTML parse fails
-        text = msg.caption or msg.text or ""
-        logging.info(f"📝 Fallback Caption/Text: {text}")
+    import re
 
-    # Extract Spotify track ID from the text
+    # Get raw text (caption or text)
+    text = msg.caption or msg.text or ""
+    logging.info(f"📝 Raw text: {repr(text)}")
+
+    # Check entities (link formatting etc.)
+    if msg.entities:
+        for entity in msg.entities:
+            if entity.type == "text_link":
+                url = entity.url
+                logging.info(f"🔗 Found text_link entity: {url}")
+                match = re.search(r'https?://open\.spotify\.com/track/([a-zA-Z0-9]+)', url)
+                if match:
+                    return {"track_id": match.group(1)}
+
+    # Fallback: look for visible URL in plain text
     match = re.search(r'https?://open\.spotify\.com/track/([a-zA-Z0-9]+)', text)
     if match:
+        logging.info(f"✅ Spotify ID from plain text: {match.group(1)}")
         return {"track_id": match.group(1)}
-    
+
+    logging.warning("⚠️ No Spotify link found.")
     return {"track_id": None}
+    
     
 
 
