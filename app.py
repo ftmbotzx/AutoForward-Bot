@@ -6,8 +6,8 @@ import asyncio
 
 # --- CONFIG ---
 MONGO_URI = "mongodb+srv://ftmbotzx:ftmbotzx@cluster0.0b8imks.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0"
-DB_NAME = "forwarderDB"
-PROGRESS_COLLECTION = "progress1"
+DB_NAME = "forwardDB"
+PROGRESS_COLLECTION = "ftmdb"
 FORWARDED_COLLECTION = "forwarded_files"
 
 # --- Flask App ---
@@ -40,12 +40,26 @@ def home():
 def get_stats():
     """Get current stats (total, forwarded, skipped)."""
     async def fetch_stats():
-        return await progress_col.find_one({"_id": "stats"}) or {
-            "total": 0,
-            "forwarded": 0,
-            "skipped": 0,
-            "last_updated": int(time.time())
-        }
+        # Get last message ID
+        last_id_doc = await progress_col.find_one({"_id": "last_id"})
+        last_id = last_id_doc.get("message_id", 18161900) if last_id_doc else 18161900
+        
+        # Import stats from main.py if available
+        try:
+            import main
+            current_stats = main.stats.copy()
+            current_stats["last_message_id"] = last_id
+            current_stats["session_start_id"] = main.session_start_id
+            current_stats["uptime_minutes"] = round((time.time() - main.start_time) / 60, 1)
+            return current_stats
+        except:
+            return {
+                "total_messages": 0,
+                "forwarded": 0,
+                "skipped": 0,
+                "last_message_id": last_id,
+                "last_updated": int(time.time())
+            }
 
     stats = run_async(fetch_stats())
     return jsonify(stats)
@@ -74,7 +88,7 @@ def get_files():
 def get_progress():
     """Get last forwarded message ID for auto-resume."""
     async def fetch_progress():
-        return await progress_col.find_one({"_id": "last_id"}) or {"message_id": 0}
+        return await progress_col.find_one({"_id": "last_id"}) or {"message_id": 18161900}
 
     progress = run_async(fetch_progress())
     return jsonify(progress)
