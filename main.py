@@ -114,9 +114,9 @@ def extract_spotify_from_msg(msg) -> dict:
 # ✅ Handle stats & ping in PROGRESS_CHANNEL
 @app.on_message(filters.chat(PROGRESS_CHANNEL) & filters.text)
 async def handle_commands(client, message):
-    if message.text.lower() == "stats":
+    if message.text.lower() == "!stats":
         await send_progress_bar()
-    elif message.text.lower() == "ping":
+    elif message.text.lower() == "!ping":
         start = time.time()
         m = await message.reply_text("🏓 Pong...")
         end = time.time()
