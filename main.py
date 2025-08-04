@@ -25,7 +25,7 @@ pyroutils.MIN_CHANNEL_ID = -100999999999999
 # ✅ MongoDB setup
 MONGO_URI = "mongodb+srv://ftmbotzx:ftmbotzx@cluster0.0b8imks.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0"
 DB_NAME = "forwaerDB"
-COLLECTION_NAME = "progress1"
+COLLECTION_NAME = "progress2"
 
 mongo_client = AsyncIOMotorClient(MONGO_URI)
 db = mongo_client[DB_NAME]
@@ -89,20 +89,25 @@ async def send_progress_bar():
 import re
 
 def extract_spotify_from_msg(msg) -> dict:
-    import re
-    from pyrogram.helpers import render_message
+    import re
+    from pyrogram.helpers import render_message
 
-    try:
-        text = render_message(msg, "html")
-        logging.info(f"🔎 HTML Caption/Text: {text}")
-    except Exception:
-        text = msg.caption or msg.text or ""
-        logging.info(f"📝 Fallback Caption/Text: {text}")
+    try:
+        # Try getting HTML version of caption or text
+        text = render_message(msg, "html")
+        logging.info(f"🔎 HTML Caption/Text: {text}")
+    except Exception:
+        # Fallback to raw caption/text if HTML parse fails
+        text = msg.caption or msg.text or ""
+        logging.info(f"📝 Fallback Caption/Text: {text}")
 
-    match = re.search(r'https?://open\.spotify\.com/track/([a-zA-Z0-9]+)', text)
-    if match:
-        return {"track_id": match.group(1)}
-    return {"track_id": None}
+    # Extract Spotify track ID from the text
+    match = re.search(r'https?://open\.spotify\.com/track/([a-zA-Z0-9]+)', text)
+    if match:
+        return {"track_id": match.group(1)}
+    
+    return {"track_id": None}
+    
 
 
 
