@@ -23,7 +23,7 @@ pyroutils.MIN_CHANNEL_ID = -100999999999999
 # ✅ MongoDB setup
 MONGO_URI = "mongodb+srv://ftmbotzx:ftmbotzx@cluster0.0b8imks.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0"
 DB_NAME = "forwaerDB"
-COLLECTION_NAME = "progress"
+COLLECTION_NAME = "progress1"
 
 mongo_client = AsyncIOMotorClient(MONGO_URI)
 db = mongo_client[DB_NAME]
