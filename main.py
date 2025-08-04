@@ -3,6 +3,8 @@ from pyrogram import Client, filters
 from pyrogram import utils as pyroutils
 from motor.motor_asyncio import AsyncIOMotorClient  # MongoDB (async)
 import app  # ✅ Import our API module
+from pyrogram.helpers import render_message
+
 
 # ✅ Pass main.py’s running loop to Flask
 app.set_shared_loop(asyncio.get_event_loop())
@@ -86,11 +88,21 @@ async def send_progress_bar():
 
 import re
 
-def extract_spotify_from_caption(caption: str) -> dict:
-    match = re.search(r'https?://open\.spotify\.com/track/([a-zA-Z0-9]+)', caption)
-    if match:
-        return {"track_id": match.group(1)}
-    return {"track_id": None}
+def extract_spotify_from_msg(msg) -> dict:
+    import re
+    from pyrogram.helpers import render_message
+
+    try:
+        text = render_message(msg, "html")
+        logging.info(f"🔎 HTML Caption/Text: {text}")
+    except Exception:
+        text = msg.caption or msg.text or ""
+        logging.info(f"📝 Fallback Caption/Text: {text}")
+
+    match = re.search(r'https?://open\.spotify\.com/track/([a-zA-Z0-9]+)', text)
+    if match:
+        return {"track_id": match.group(1)}
+    return {"track_id": None}
 
 
 
@@ -120,9 +132,8 @@ async def poll_channel():
                 stats["total_messages"] += 1
                 try:
                     # ✅ Extract Spotify ID from caption
-                    caption = msg.caption or ""
-                    logging.info(f"New {caption}")
-                    track_info = extract_spotify_from_caption(caption)
+                    
+                    track_info = extract_spotify_from_msg(msg)
                     track_id = track_info.get("track_id") or "N/A"
 
                     # ✅ Get song & artist metadata
