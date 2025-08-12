@@ -135,9 +135,7 @@ async def send_progress_bar():
 
 
 
-
-
-# ✅ Handle stats & ping in PROGRESS_CHANNEL
+#ftmdev
 @client.on(events.NewMessage(chats=PROGRESS_CHANNEL, pattern=r'^!(stats|ping|db)$'))
 async def handle_commands(event):
     command = event.pattern_match.group(1).lower()
