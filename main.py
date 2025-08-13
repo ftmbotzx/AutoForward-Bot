@@ -15,7 +15,7 @@ logging.basicConfig(
 )
 
 # ✅ MongoDB setup
-MONGO_URI = "mongodb+srv://ftmbotzx:ftmbotzx@cluster0.0b8imks.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0"
+MONGO_URI = "mongodb+srv://ftmeditron:ftm@cluster0.plyrl7d.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0"
 DB_NAME = "ftmdb"
 COLLECTION_NAME = "ftmdb"
 
