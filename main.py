@@ -1,21 +1,33 @@
-import logging, asyncio, time, re
-from telethon import TelegramClient, events, sync
-from telethon.tl.functions.messages import GetDialogsRequest
+import logging
+import asyncio
+import time
+import re
+import os
+from telethon import TelegramClient, events
 from telethon.sessions import StringSession
-from motor.motor_asyncio import AsyncIOMotorClient  # MongoDB (async)
-import app  # ✅ Import our API module
+from motor.motor_asyncio import AsyncIOMotorClient
+import app  # Flask API module
 
-# ✅ Start Flask API server (will set loop later)
+# Start Flask API server
 app.start_api_server()
-# ✅ Logging setup
+
+# Logging setup
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - %(levelname)s - %(message)s",
     handlers=[logging.StreamHandler()]
 )
 
-# ✅ MongoDB setup
-MONGO_URI = "mongodb+srv://ftmeditron:ftm@cluster0.plyrl7d.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0"
+# Suppress Flask/Werkzeug logs to reduce noise
+logging.getLogger('werkzeug').setLevel(logging.ERROR)
+logging.getLogger('flask').setLevel(logging.ERROR)
+
+# Create a specific logger for the main bot
+bot_logger = logging.getLogger('main_bot')
+bot_logger.setLevel(logging.INFO)
+
+# MongoDB setup
+MONGO_URI = os.getenv("MONGO_URI", "mongodb+srv://ftmeditron:ftm@cluster0.plyrl7d.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0")
 DB_NAME = "ftmdb"
 COLLECTION_NAME = "ftmdb"
 
@@ -23,30 +35,29 @@ mongo_client = AsyncIOMotorClient(MONGO_URI)
 db = mongo_client[DB_NAME]
 progress_col = db[COLLECTION_NAME]
 
-# ✅ Telethon Client (your string session)
-api_id = 8012239  # Replace with your API ID
-api_hash = '171e6f1bf66ed8dcc5140fbe827b6b08'  # Replace with your API hash
-session_string = "1BVtsOIsBuz87kY2XOsjO2cVFnHJQoweOxT1UHxPcMD0INENo4rIyVNWmut-GUozCk0m5--J9HehX7Vg_cvPWrapE9x5hbSyfBVPRAJSAB2Y1iVNJGjyAvpNCWYumzG2Np4adB-AUKboLFjjWTKsKS9r8NBEes3mdDNdpV63LICOGMnqfSjJ2DYd51luISvVFU-D61GgaL3Ig8z4Pl05qx7eoYrBumtCJKqPjpSEQpuP5S4Ch1QVMFozp8FjpQkp4XnTaNXkOjH64FTU-GCQRcaSqKUFfIaXJEtrH_sbC06osxHuk4OoDh4v0cDV_7ASWoW11KvTBM7uc2IOJ8-6OM4SzXukh0MU=" # Replace with your string session
+# Telethon Client setup
+api_id = int(os.getenv("API_ID", "8012239"))
+api_hash = os.getenv("API_HASH", "171e6f1bf66ed8dcc5140fbe827b6b08")
+session_string = os.getenv("SESSION_STRING", "1BVtsOIsBuz87kY2XOsjO2cVFnHJQoweOxT1UHxPcMD0INENo4rIyVNWmut-GUozCk0m5--J9HehX7Vg_cvPWrapE9x5hbSyfBVPRAJSAB2Y1iVNJGjyAvpNCWYumzG2Np4adB-AUKboLFjjWTKsKS9r8NBEes3mdDNdpV63LICOGMnqfSjJ2DYd51luISvVFU-D61GgaL3Ig8z4Pl05qx7eoYrBumtCJKqPjpSEQpuP5S4Ch1QVMFozp8FjpQkp4XnTaNXkOjH64FTU-GCQRcaSqKUFfIaXJEtrH_sbC06osxHuk4OoDh4v0cDV_7ASWoW11KvTBM7uc2IOJ8-6OM4SzXukh0MU=")
+
 client = TelegramClient(StringSession(session_string), api_id, api_hash)
 
+# Channels Config
+SOURCE_CHANNEL = os.getenv("SOURCE_CHANNEL", "Spotifyapk56")
+TARGET_CHANNEL = int(os.getenv("TARGET_CHANNEL", "-1002752194267"))
+PROGRESS_CHANNEL = os.getenv("PROGRESS_CHANNEL", "@ftmdeveloperz")
 
-# ✅ Channels Config
-SOURCE_CHANNEL = "Spotifyapk56"        # Source channel username (without @)
-TARGET_CHANNEL = -1002752194267     # Target private channel ID
-PROGRESS_CHANNEL = "@ftmdeveloperz"    # Log channel
-
-# ✅ Stats tracking
+# Stats tracking
 stats = {"total_messages": 0, "forwarded": 0, "skipped": 0, "duplicates": 0, "errors": 0}
 start_time = time.time()
-session_start_id = None  # Track where this session started from
-is_paused = False  # Bot pause/resume control
-forwarding_speed = 5  # Delay between messages in seconds
+session_start_id = None
+is_paused = False
+forwarding_speed = int(os.getenv("FORWARDING_SPEED", "3"))  # Delay between messages
+is_catch_up_complete = False  # Track if we're in catch-up or live mode
 
-# 🔍 Spotify Link Extractor
+# Spotify Link Extractor - keeping original logic
 def extract_spotify_from_msg(msg) -> dict:
-    import re
-
-    # Get raw text (caption or text)
+    """Extract Spotify track ID from message text or entities"""
     text = msg.message or ""
     logging.info(f"📝 Raw text: {repr(text)}")
 
@@ -69,13 +80,14 @@ def extract_spotify_from_msg(msg) -> dict:
     logging.warning("⚠️ No Spotify link found.")
     return {"track_id": None}
 
-
-# ✅ MongoDB helpers
+# MongoDB helpers
 async def get_last_message_id():
+    """Get the last processed message ID from database"""
     doc = await progress_col.find_one({"_id": "last_id"})
-    return doc["message_id"] if doc else 18246934  # Default start point when DB is empty
+    return doc["message_id"] if doc else 18246934
 
 async def save_last_message_id(msg_id):
+    """Save the last processed message ID to database"""
     await progress_col.update_one(
         {"_id": "last_id"},
         {"$set": {"message_id": msg_id, "timestamp": time.time()}},
@@ -145,58 +157,35 @@ async def restart_from_message_id(target_msg_id):
     """Restart forwarding from a specific message ID"""
     try:
         await save_last_message_id(target_msg_id - 1)  # Set to one before target so we start from target
-        global session_start_id
+        global session_start_id, is_catch_up_complete
         session_start_id = target_msg_id
+        is_catch_up_complete = False  # Reset to catch-up mode
         logging.info(f"🔄 Restarted forwarding from message ID: {target_msg_id}")
         return True
     except Exception as e:
         logging.error(f"❌ Failed to restart from message ID {target_msg_id}: {e}")
         return False
 
-async def check_database_status():
-    """Check database connection and last message ID with message details"""
-    try:
-        doc = await progress_col.find_one({"_id": "last_id"})
-        if doc:
-            last_msg_id = doc['message_id']
-
-            # Try to get details of the message from the source channel
-            try:
-                message = await client.get_messages(SOURCE_CHANNEL, ids=last_msg_id)
-                if message:
-                    msg_text = message.message[:50] + "..." if message.message and len(message.message) > 50 else (message.message or "No text")
-                    msg_date = message.date.strftime("%Y-%m-%d %H:%M:%S") if message.date else "Unknown date"
-
-                    session_info = f"\n🚀 Session started from: {session_start_id}\n📈 Progress this session: {last_msg_id - session_start_id} messages" if session_start_id else ""
-
-                    return f"✅ Database connected.\n📍 Last processed: ID {last_msg_id}\n📝 Message: {msg_text}\n📅 Date: {msg_date}\n🔗 Link: https://t.me/{SOURCE_CHANNEL}/{last_msg_id}{session_info}"
-                else:
-                    return f"✅ Database connected.\n📍 Last message ID: {last_msg_id}\n⚠️ Message not found in channel"
-            except Exception as e:
-                return f"✅ Database connected.\n📍 Last message ID: {last_msg_id}\n❌ Could not fetch message details: {e}"
-        else:
-            return "⚠️ Database connected but no last_id found. Will start from default message ID 18161900."
-    except Exception as e:
-        return f"❌ Database error: {e}"
-
-# ✅ Manual progress bar (only triggered on /stats)
 async def send_progress_bar():
+    """Send progress statistics to progress channel"""
     elapsed_minutes = max((time.time() - start_time) / 60, 1)
     speed = round(stats['forwarded'] / elapsed_minutes, 2)
-    percentage = (stats['forwarded'] / stats['total_messages'] * 100) if stats['total_messages'] > 0 else 0
-
-    # Get current last processed message ID
     current_last_id = await get_last_message_id()
+    
+    mode = "🔴 Live Mode" if is_catch_up_complete else "🟡 Catch-up Mode"
+    session_processed = current_last_id - session_start_id if session_start_id else 0
 
     text = f"""
 ╔════❰ ғᴏʀᴡᴀʀᴅ sᴛᴀᴛᴜs ❱═❍⊱❁
+║┣⪼ ᴍᴏᴅᴇ: {mode}
 ║┣⪼ sᴇssɪᴏɴ sᴛᴀʀᴛᴇᴅ ғʀᴏᴍ: {session_start_id}
 ║┣⪼ ᴄᴜʀʀᴇɴᴛ ʟᴀsᴛ ɪᴅ: {current_last_id}
 ║┣⪼ ᴛᴏᴛᴀʟ ᴄʜᴇᴄᴋᴇᴅ: {stats['total_messages']}
 ║┣⪼ ғᴏʀᴡᴀʀᴅᴇᴅ: {stats['forwarded']}
 ║┣⪼ sᴋɪᴘᴘᴇᴅ: {stats['skipped']}
+║┣⪼ ᴇʀʀᴏʀs: {stats['errors']}
 ║┣⪼ sᴘᴇᴇᴅ: {speed} ᴍsɢs/ᴍɪɴ
-║┣⪼ ᴘʀᴏɢʀᴇss: {current_last_id - session_start_id} ᴍsɢs ᴘʀᴏᴄᴇssᴇᴅ
+║┣⪼ ᴘʀᴏɢʀᴇss: {session_processed} ᴍsɢs ᴘʀᴏᴄᴇssᴇᴅ
 ║┣⪼ ᴜᴘᴛɪᴍᴇ: {round(elapsed_minutes, 1)} ᴍɪɴᴜᴛᴇs
 ╚════❰ ᴘʀᴏɢʀᴇssɪɴɢ ❱══❍⊱❁
 """
@@ -206,11 +195,10 @@ async def send_progress_bar():
     except Exception as e:
         logging.error(f"⚠️ Could not send progress bar: {e}")
 
-
-
-#ftmdev
+# Command handlers - keeping original logic
 @client.on(events.NewMessage(chats=PROGRESS_CHANNEL, pattern=r'^!(stats|ping|db|restart)(?:\s+(\d+))?$'))
 async def handle_commands(event):
+    """Handle bot commands from progress channel"""
     command = event.pattern_match.group(1).lower()
     arg = event.pattern_match.group(2)
     logging.info(f"🔧 Command received: {command} {arg or ''}")
@@ -228,8 +216,8 @@ async def handle_commands(event):
             await event.reply(f"❌ {report['error']}")
         else:
             recent_msgs = "\n".join([
-                f"• ID {msg['id']}: {msg['song'][:30]}... - {msg['status']}"
-                for msg in report['recent_messages'][:5]
+                f"• ID {msg.get('id', 'N/A')}: {str(msg.get('song', 'Unknown'))[:30]}... - {msg.get('status', 'unknown')}"
+                for msg in report.get('recent_messages', [])[:5]
             ])
             
             db_report = f"""
@@ -241,7 +229,7 @@ async def handle_commands(event):
 ║┣⪼ ғᴏʀᴡᴀʀᴅᴇᴅ: {report['forwarded']}
 ║┣⪼ ᴇʀʀᴏʀs: {report['errors']}
 ║┣⪼ ᴜᴘᴛɪᴍᴇ: {report['uptime_hours']}ʜ
-║┣⪼ ʟɪᴠᴇ sᴛᴀᴛs: ᴛ:{report['stats']['total_messages']} ғ:{report['stats']['forwarded']} s:{report['stats']['skipped']}
+║┣⪼ ʟɪᴠᴇ sᴛᴀᴛs: ᴛ:{report.get('stats', {}).get('total_messages', 0)} ғ:{report.get('stats', {}).get('forwarded', 0)} s:{report.get('stats', {}).get('skipped', 0)}
 ║
 ║📋 ʀᴇᴄᴇɴᴛ ᴍᴇssᴀɢᴇs:
 {recent_msgs}
@@ -259,154 +247,223 @@ async def handle_commands(event):
         else:
             await event.reply("❌ Usage: !restart <message_id>\nExample: !restart 18246934")
 
-# ✅ Main polling function
-async def poll_channel():
-    global session_start_id
+# Live message handler for new messages (only active after catch-up is complete)
+@client.on(events.NewMessage(chats=SOURCE_CHANNEL))
+async def handle_new_message(event):
+    """Handle new incoming messages in live mode"""
+    if not is_catch_up_complete:
+        return  # Skip if still in catch-up mode
+    
+    if is_paused:
+        return  # Skip if paused
+    
+    msg = event.message
+    logging.info(f"🔴 Live message received: ID {msg.id}")
+    
+    # Check if message is newer than our last processed ID
     last_id = await get_last_message_id()
-    session_start_id = last_id  # Track where this session started
-
-    logging.info(f"▶ Resuming from message ID: {last_id}")
-
-    # Send session start notification
+    if msg.id <= last_id:
+        return  # Already processed or older
+    
     try:
-        start_msg = await client.get_messages(SOURCE_CHANNEL, ids=last_id)
-        if start_msg:
-            await client.send_message(PROGRESS_CHANNEL, 
-                f"🚀 **Session Started**\n"
-                f"📍 Starting from: ID {last_id}\n"
-                f"🔗 Link: https://t.me/{SOURCE_CHANNEL}/{last_id}\n"
-                f"⏰ Started at: {time.strftime('%Y-%m-%d %H:%M:%S')}")
+        await process_message(msg)
+        await save_last_message_id(msg.id)
+        logging.info(f"✅ Live forwarded message {msg.id}")
     except Exception as e:
-        logging.error(f"Could not send session start notification: {e}")
+        logging.error(f"❌ Error in live forwarding message {msg.id}: {e}")
 
-    while True:
+async def process_message(msg):
+    """Process and forward a single message - preserves original caption logic"""
+    stats["total_messages"] += 1
+    
+    # Extract Spotify ID from caption
+    track_info = extract_spotify_from_msg(msg)
+    track_id = track_info.get("track_id") or "N/A"
+
+    # Get song & artist metadata
+    song_name = "Unknown Title"
+    artist_name = "Unknown Artist"
+
+    if hasattr(msg, 'media') and msg.media:
+        if hasattr(msg.media, 'document') and msg.media.document:
+            for attr in msg.media.document.attributes:
+                if hasattr(attr, 'title') and attr.title:
+                    song_name = attr.title
+                if hasattr(attr, 'performer') and attr.performer:
+                    artist_name = attr.performer
+
+    if song_name == "Unknown Title" and msg.message:
+        song_name = msg.message
+
+    # Check if source is Spotifyapk56 or similar music channel - preserving original logic
+    source_str = str(SOURCE_CHANNEL).lower()
+    is_spotify_channel = ('spotifyapk' in source_str or 
+                        'spotify' in source_str or 
+                        SOURCE_CHANNEL == 'Spotifyapk56' or 
+                        SOURCE_CHANNEL == '@Spotifyapk56')
+    
+    if is_spotify_channel:
+        # Build enhanced caption for Spotify channel with track ID
+        caption_parts = [f"🎵 {song_name}", f"👤 {artist_name}"]
+        
+        if track_id != "N/A":
+            caption_parts.append(f"🆔 {track_id}")
+        caption_text = "\n".join(caption_parts)
+    else:
+        # For other channels, use original caption as-is
+        caption_text = msg.message if msg.message else None
+
+    # Forward message with new caption
+    if hasattr(msg, 'media') and msg.media:
+        await client.send_file(TARGET_CHANNEL, msg.media, caption=caption_text or "")
+    else:
+        await client.forward_messages(TARGET_CHANNEL, msg)
+
+    # Save message record to database
+    await save_message_record(msg.id, track_id, song_name, artist_name, "forwarded")
+    
+    stats["forwarded"] += 1
+
+async def sequential_catch_up():
+    """Sequential message processing from last_id + 1, incrementing by 1"""
+    global is_catch_up_complete
+    
+    last_id = await get_last_message_id()
+    current_id = last_id + 1
+    
+    logging.info(f"🟡 Starting sequential catch-up from message ID: {current_id}")
+    
+    consecutive_missing = 0
+    max_consecutive_missing = 100  # Stop after 100 consecutive missing messages
+    
+    while consecutive_missing < max_consecutive_missing:
+        if is_paused:
+            await asyncio.sleep(1)
+            continue
+            
         try:
-            new_last_id = last_id
-            async for msg in client.iter_messages(SOURCE_CHANNEL, limit=50):
-                if msg.id <= last_id:
-                    break  # Only process new messages
-
-                # ✅ Check if bot is paused
-                if is_paused:
-                    await asyncio.sleep(1)
-                    continue
-                    
-                stats["total_messages"] += 1
+            # Fetch specific message by ID
+            msg = await client.get_messages(SOURCE_CHANNEL, ids=current_id)
+            
+            if msg is None:
+                # Message doesn't exist or is deleted
+                logging.info(f"⚠️ Message ID {current_id} not found, skipping...")
+                stats["skipped"] += 1
+                consecutive_missing += 1
+            else:
+                # Reset consecutive missing counter
+                consecutive_missing = 0
+                
                 try:
-                    # ✅ Extract Spotify ID from caption
-                    track_info = extract_spotify_from_msg(msg)
-                    track_id = track_info.get("track_id") or "N/A"
-
-                    # ✅ Get song & artist metadata
-                    song_name = "Unknown Title"
-                    artist_name = "Unknown Artist"
-
-                    if hasattr(msg, 'media') and msg.media:
-                        if hasattr(msg.media, 'document') and msg.media.document:
-                            for attr in msg.media.document.attributes:
-                                if hasattr(attr, 'title') and attr.title:
-                                    song_name = attr.title
-                                if hasattr(attr, 'performer') and attr.performer:
-                                    artist_name = attr.performer
-
-                    if song_name == "Unknown Title" and msg.message:
-                        song_name = msg.message
-
-                    # ✅ Check if source is Spotifyapk56 or similar music channel that needs caption formatting
-                    source_str = str(SOURCE_CHANNEL).lower()
-                    is_spotify_channel = ('spotifyapk' in source_str or 
-                                        'spotify' in source_str or 
-                                        SOURCE_CHANNEL == 'Spotifyapk56' or 
-                                        SOURCE_CHANNEL == '@Spotifyapk56')
-                    
-                    if is_spotify_channel:
-                        # ✅ Build enhanced caption for Spotify channel with track ID
-                        file_size_mb = msg.media.document.size // (1024*1024) if hasattr(msg, 'media') and msg.media and hasattr(msg.media, 'document') else 0
-                        spotify_link = f"https://open.spotify.com/track/{track_id}" if track_id != "N/A" else ""
-                        
-                        caption_parts = [f"🎵 {song_name}", f"👤 {artist_name}"]
-                        
-                        if track_id != "N/A":
-                            caption_parts.append(f"🆔 {track_id}")
-                        caption_text = "\n".join(caption_parts)
-                    else:
-                        # ✅ For other channels, use original caption as-is
-                        caption_text = msg.message if msg.message else None
-
-                    # ✅ Forward message with new caption
-                    if hasattr(msg, 'media') and msg.media:
-                        await client.send_file(TARGET_CHANNEL, msg.media, caption=caption_text)
-                    else:
-                        await client.forward_messages(TARGET_CHANNEL, msg)
-
-                    # ✅ Save message record to database
-                    await save_message_record(msg.id, track_id, song_name, artist_name, "forwarded")
-                    
-                    stats["forwarded"] += 1
-                    new_last_id = max(new_last_id, msg.id)
-                    logging.info(f"✅ Forwarded message {msg.id}")
-
-                    # ✅ Apply forwarding speed delay
-                    await asyncio.sleep(forwarding_speed)
-
+                    await process_message(msg)
+                    logging.info(f"✅ Sequential forwarded message {current_id}")
                 except Exception as e:
-                    stats["skipped"] += 1
                     stats["errors"] += 1
+                    await save_message_record(current_id, "N/A", "Error", "Error", "error")
+                    logging.error(f"❌ Error processing message {current_id}: {e}")
                     
-                    # ✅ Save error record to database
-                    await save_message_record(msg.id, "N/A", "Error", "Error", "error")
-                    
-                    logging.error(f"❌ Error forwarding message {msg.id}: {e}")
-                    await client.send_message(PROGRESS_CHANNEL, f"⚠️ Forward error for `{msg.id}`\n{e}")
-
-            # ✅ Save progress if new messages processed
-            if new_last_id > last_id:
-                await save_last_message_id(new_last_id)
-                last_id = new_last_id
-
+                # Apply forwarding speed delay
+                await asyncio.sleep(forwarding_speed)
+            
+            # Update last processed ID and move to next
+            await save_last_message_id(current_id)
+            current_id += 1
+            
         except Exception as e:
-            logging.error(f"⚠️ Polling error: {e}")
-            await client.send_message(PROGRESS_CHANNEL, f"⚠️ Polling error: {e}")
+            logging.error(f"❌ Error fetching message {current_id}: {e}")
+            stats["errors"] += 1
+            consecutive_missing += 1
+            current_id += 1
+            await asyncio.sleep(2)  # Brief pause on errors
+    
+    # Switch to live mode after catch-up is complete
+    is_catch_up_complete = True
+    logging.info(f"🔴 Catch-up complete! Switching to live mode. Last processed ID: {current_id - 1}")
+    
+    try:
+        await client.send_message(PROGRESS_CHANNEL, 
+            f"✅ **Catch-up Complete**\n"
+            f"📍 Last processed: ID {current_id - 1}\n"
+            f"🔴 Switched to live mode\n"
+            f"📊 Session stats: {stats['forwarded']} forwarded, {stats['skipped']} skipped")
+    except Exception as e:
+        logging.error(f"Could not send catch-up complete notification: {e}")
 
-        await asyncio.sleep(5)  # Poll every 5 sec
-
-# ✅ Main function
 async def main():
-    # ✅ Set shared loop for Flask API
+    """Main function - entry point"""
+    global session_start_id
+    
+    logging.info("🚀 Starting Telegram Bot main function...")
+    
+    # Set shared loop for Flask API
     loop = asyncio.get_event_loop()
     app.set_shared_loop(loop)
     
+    # Start Telethon client
     await client.start()
     me = await client.get_me()
     logging.info(f"✅ Logged in as {me.first_name} ({me.id})")
 
+    # Validate channels
     try:
         src_chat = await client.get_entity(SOURCE_CHANNEL)
-        logging.info(f"📡 Source channel resolved: {src_chat.title} ({src_chat.id})")
+        if hasattr(src_chat, 'title'):
+            logging.info(f"📡 Source channel resolved: {src_chat.title} ({src_chat.id})")
+        else:
+            logging.info(f"📡 Source channel resolved: {SOURCE_CHANNEL} ({src_chat.id})")
     except Exception as e:
         logging.error(f"❌ Could not resolve source channel: {e}")
+        return
 
     try:
         tgt_chat = await client.get_entity(TARGET_CHANNEL)
-        logging.info(f"📡 Target channel resolved: {tgt_chat.title} ({tgt_chat.id})")
+        if hasattr(tgt_chat, 'title'):
+            logging.info(f"📡 Target channel resolved: {tgt_chat.title} ({tgt_chat.id})")
+        else:
+            logging.info(f"📡 Target channel resolved: {TARGET_CHANNEL} ({tgt_chat.id})")
     except Exception as e:
         logging.error(f"❌ Could not resolve target channel: {e}")
+        return
 
-    # ✅ Initialize from specific message ID (18246934)
+    # Initialize session start point
     current_last_id = await get_last_message_id()
+    session_start_id = current_last_id + 1
+    
     if current_last_id < 18246934:
         await restart_from_message_id(18246934)
+        session_start_id = 18246934
         logging.info("🔄 Initialized starting point to message ID: 18246934")
 
-    await client.send_message(PROGRESS_CHANNEL, 
-        "🚀 **Forwarder Bot started**\n"
-        f"📍 Ready to forward from: https://t.me/{SOURCE_CHANNEL}/18246934\n"
-        "🔧 Commands: !stats !db !ping !restart <id>")
+    # Send startup notification
+    try:
+        await client.send_message(PROGRESS_CHANNEL, 
+            f"🚀 **Forwarder Bot Started**\n"
+            f"📍 Starting sequential catch-up from: ID {session_start_id}\n"
+            f"📡 Source: https://t.me/{SOURCE_CHANNEL}\n"
+            f"🎯 Target: {TARGET_CHANNEL}\n"
+            f"🔧 Commands: !stats !db !ping !restart <id>\n"
+            f"⚡ Speed: {forwarding_speed}s delay")
+    except Exception as e:
+        logging.error(f"Could not send startup notification: {e}")
 
-    asyncio.create_task(poll_channel())  # Start polling
+    # Start sequential catch-up process
+    asyncio.create_task(sequential_catch_up())
 
+    # Keep the main loop running
     while True:
         await asyncio.sleep(60)
+        
+        # Send periodic status updates every 10 minutes
+        if int(time.time()) % 600 == 0:
+            try:
+                await send_progress_bar()
+            except Exception as e:
+                logging.error(f"Error sending periodic update: {e}")
 
 if __name__ == "__main__":
+    print("🚀 Starting main.py execution...")
+    print("⏰ Waiting for Flask server to initialize...")
+    import time
+    time.sleep(3)  # Give Flask server time to start
+    print("🤖 Now starting Telegram bot main function...")
     asyncio.run(main())
