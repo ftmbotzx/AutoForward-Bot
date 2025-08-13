@@ -16,8 +16,8 @@ logging.basicConfig(
 
 # ✅ MongoDB setup
 MONGO_URI = "mongodb+srv://ftmbotzx:ftmbotzx@cluster0.0b8imks.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0"
-DB_NAME = "forwardDB"
-COLLECTION_NAME = "ftmdb1"
+DB_NAME = "ftmdb"
+COLLECTION_NAME = "ftmdb"
 
 mongo_client = AsyncIOMotorClient(MONGO_URI)
 db = mongo_client[DB_NAME]
@@ -73,7 +73,7 @@ def extract_spotify_from_msg(msg) -> dict:
 # ✅ MongoDB helpers
 async def get_last_message_id():
     doc = await progress_col.find_one({"_id": "last_id"})
-    return doc["message_id"] if doc else 18161900  # Default start point when DB is empty
+    return doc["message_id"] if doc else 18246934  # Default start point when DB is empty
 
 async def save_last_message_id(msg_id):
     await progress_col.update_one(
