@@ -5,7 +5,7 @@ from motor.motor_asyncio import AsyncIOMotorClient
 import asyncio
 
 # --- CONFIG ---
-MONGO_URI = "mongodb+srv://ftmbotzx:ftmbotzx@cluster0.0b8imks.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0"
+MONGO_URI = "mongodb+srv://ftmeditron:ftm@cluster0.plyrl7d.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0"
 DB_NAME = "ftmdb"
 PROGRESS_COLLECTION = "ftmdb"
 FORWARDED_COLLECTION = "forwarded_files"
