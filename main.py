@@ -38,7 +38,7 @@ progress_col = db[COLLECTION_NAME]
 # Telethon Client setup
 api_id = int(os.getenv("API_ID", "8012239"))
 api_hash = os.getenv("API_HASH", "171e6f1bf66ed8dcc5140fbe827b6b08")
-session_string = os.getenv("SESSION_STRING", "1BVtsOIIBuy0Pghyup2lOE1yDjXg-mRoTWpCmQ-jxDqBvJXhD4leCcMdVKouFgkWE33a3EH1DZepwVKs8eaPkL3N9uSl_nG469aP94TeoP5FOqcXIvAIXbndK_wmgGkC0UwPHE8enIu8AQogIcwSdf9cbs5Lk1xq2OuLF4uEgXTwulRRrUXlVY0SaSy6T4LZcRPB1EEYLSRDl1-i0Yw8Pg22C8ktSVzGZHovzt2rh51C7BUhv1QaNYqjVTVtDDPo6HO71qyQ2MGOlU7s-gadC_9VcqhrfAgHbRMvuKNnz-2lh2ESuWCxtuTwThHVBZdbSwrLatCyBBc4cBR1ZEkYl2-qUEQckVjQ=")
+session_string = os.getenv("SESSION_STRING", "df9cbs5Lk1xq2OuLF4uEgXTwulRRrUXlVY0SaSy6T4LZcRPB1EEYLSRDl1-i0Yw8Pg22C8ktSVzGZHovzt2rh51C7BUhv1QaNYqjVTVtDDPo6HO71qyQ2MGOlU7s-gadC_9VcqhrfAgHbRMvuKNnz-2lh2ESuWCxtuTwThHVBZdbSwrLatCyBBc4cBR1ZEkYl2-qUEQckVjQ=")
 
 client = TelegramClient(StringSession(session_string), api_id, api_hash)
 
